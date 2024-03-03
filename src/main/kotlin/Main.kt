@@ -269,7 +269,7 @@ fun analyze(sourceCode: String): Pair<Pair<List<Token>, List<String>>, List<Stri
             var foundValidToken = false
 
             for (tokenType in TokenType.values()) {
-                val matcher = Pattern.compile(tokenType.pattern).matcher(word)
+                val matcher = Regex(tokenType.pattern).toPattern().matcher(word)
                 if (matcher.matches()) {
                     tokens.add(Token(tokenType, word))
                     if (tokenType == TokenType.IDENTIFIER && !vars.contains(word)) {
@@ -288,7 +288,151 @@ fun analyze(sourceCode: String): Pair<Pair<List<Token>, List<String>>, List<Stri
         }
     }
 
-    return Pair(Pair(tokens, vars), errors)
+    val syntaxAnalyzer = SyntaxAnalyzer(tokens)
+    val syntaxAnalysisResult = syntaxAnalyzer.parse()
+
+    print(errors.toString())
+    return Pair(Pair(tokens, vars), if (syntaxAnalysisResult) errors else listOf("Syntax analysis failed!"))
+}
+
+class SyntaxAnalyzer(private val tokens: List<Token>) {
+
+    private var index = 0
+
+    fun parse(): Boolean {
+        return programa()
+    }
+
+    private fun programa(): Boolean {
+        return if (inicio() && codigo() && fin()) {
+            true
+        } else {
+            false
+        }
+    }
+
+    private fun inicio(): Boolean {
+        return matchAndAdvance(TokenType.START)
+    }
+
+    private fun fin(): Boolean {
+        return matchAndAdvance(TokenType.END)
+    }
+
+    private fun codigo(): Boolean {
+        return if (instruccion()) {
+            while (instruccion()) {}
+            true
+        } else {
+            false
+        }
+    }
+
+    private fun instruccion(): Boolean {
+        return when {
+            texto() -> true
+            operacion() -> true
+            declaracion() -> true
+            asignacion() -> true
+            else -> false
+        }
+    }
+
+    private fun texto(): Boolean {
+        return if (funcion() && parametrosTexto()) {
+            true
+        } else {
+            false
+        }
+    }
+
+    private fun funcion(): Boolean {
+        return matchAndAdvance(TokenType.OP_READ) || matchAndAdvance(TokenType.OP_WRITE)
+    }
+
+    private fun parametrosTexto(): Boolean {
+        return matchAndAdvance(TokenType.OPEN_PARENTHESES) && matchAndAdvance(TokenType.IDENTIFIER) && matchAndAdvance(
+            TokenType.CLOSE_PARENTHESES
+        )
+    }
+
+    private fun operacion(): Boolean {
+        return if (tipoOperacion() && parametrosOperacion()) {
+            true
+        } else {
+            false
+        }
+    }
+
+    private fun tipoOperacion(): Boolean {
+        return matchAndAdvance(TokenType.OP_SUM) || matchAndAdvance(TokenType.OP_RES) ||
+                matchAndAdvance(TokenType.OP_MUL) || matchAndAdvance(TokenType.OP_DIV)
+    }
+
+    private fun parametrosOperacion(): Boolean {
+        return matchAndAdvance(TokenType.OPEN_PARENTHESES) && valores() && matchAndAdvance(TokenType.CLOSE_PARENTHESES)
+    }
+
+    private fun valores(): Boolean {
+        return if (valorOperacion() && matchAndAdvance(TokenType.COMA) && valorOperacion()) {
+            true
+        } else {
+            false
+        }
+    }
+
+    private fun valorOperacion(): Boolean {
+        return matchAndAdvance(TokenType.IDENTIFIER) || matchAndAdvance(TokenType.INTEGER) ||
+                matchAndAdvance(TokenType.FLOAT) || operacion()
+    }
+
+    private fun asignacion(): Boolean {
+        return if (matchAndAdvance(TokenType.IDENTIFIER) && matchAndAdvance(TokenType.DESIGNATOR) &&
+            valorAsignado()
+        ) {
+            true
+        } else {
+            false
+        }
+    }
+
+    private fun valorAsignado(): Boolean {
+        return matchAndAdvance(TokenType.INTEGER) || matchAndAdvance(TokenType.FLOAT) || operacion()
+    }
+
+    private fun declaracion(): Boolean {
+        return if (tipoDeclaracion() && valoresDeclaracion()) {
+            true
+        } else {
+            false
+        }
+    }
+
+    private fun tipoDeclaracion(): Boolean {
+        return matchAndAdvance(TokenType.TYPE_INTEGER) || matchAndAdvance(TokenType.TYPE_FLOAT)
+    }
+
+    private fun valoresDeclaracion(): Boolean {
+        return if (valorDeclaracion()) {
+            while (matchAndAdvance(TokenType.COMA) && valorDeclaracion()) {}
+            true
+        } else {
+            false
+        }
+    }
+
+    private fun valorDeclaracion(): Boolean {
+        return matchAndAdvance(TokenType.IDENTIFIER) || asignacion()
+    }
+
+    private fun matchAndAdvance(expectedType: TokenType): Boolean {
+        return if (index < tokens.size && tokens[index].type == expectedType) {
+            index++
+            true
+        } else {
+            false
+        }
+    }
 }
 
 fun save(codeText: MutableState<TextFieldValue>, tokens: List<Token>, vars: List<String>): String {
