@@ -34,13 +34,13 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.io.File
 import java.util.*
-import java.util.regex.Pattern
 import javax.swing.JFileChooser
 import javax.swing.JOptionPane
 import javax.swing.JScrollPane
 import javax.swing.JTable
 import javax.swing.filechooser.FileNameExtensionFilter
 import kotlin.system.exitProcess
+import java.util.Stack
 
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -64,6 +64,7 @@ fun App() {
     val isHoveringExport = remember { mutableStateOf(false) }
     val isHoveringTokens = remember { mutableStateOf(false) }
     val isHoveringVariables = remember { mutableStateOf(false) }
+    val isHoveringSyntaxTree = remember { mutableStateOf(false) }
 
     val stateVertical = rememberScrollState(0)
     val stateHorizontal = rememberScrollState(0)
@@ -134,7 +135,7 @@ fun App() {
                 val errors = lists.second
                 if (errors.isEmpty()) {
                     withoutErrors.value = true
-                    consoleText.value = TextFieldValue("SOURCE CODE WITHOUT SYNTAX ERRORS")
+                    consoleText.value = TextFieldValue("SOURCE CODE WITHOUT ERRORS")
                 } else {
                     withoutErrors.value = false
                     val concatenatedErrors = errors.joinToString("\n")
@@ -251,6 +252,25 @@ fun App() {
                 Icon(imageVector = Icons.Default.List, contentDescription = null)
             }
 
+            Button(
+                onClick = {
+                    print("Árbol de sintáxis épico")
+                },
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color.Black, contentColor = Color.White),
+                modifier = Modifier.onPointerEvent(PointerEventType.Enter) { isHoveringSyntaxTree.value = true }
+                    .onPointerEvent(PointerEventType.Exit) { isHoveringSyntaxTree.value = false }.padding(8.dp).then(
+                        if (isHoveringSyntaxTree.value) Modifier.width(120.dp) else Modifier.width(120.dp)
+                    )
+            ) {
+                AnimatedVisibility(visible = isHoveringSyntaxTree.value) {
+                    Text(
+                        text = "Syntax Tree"
+                    )
+                }
+                Icon(imageVector = Icons.Default.List, contentDescription = null)
+            }
+
+
         }
     }
 }
@@ -289,46 +309,75 @@ fun analyze(sourceCode: String): Pair<Pair<List<Token>, List<String>>, List<Stri
     }
 
     val syntaxAnalyzer = SyntaxAnalyzer(tokens)
-    val syntaxAnalysisResult = syntaxAnalyzer.parse()
 
-    print(errors.toString())
-    return Pair(Pair(tokens, vars), if (syntaxAnalysisResult) errors else listOf("Syntax analysis failed!"))
+    val syntaxAnalysisResult = syntaxAnalyzer.parse()
+    if (!syntaxAnalysisResult) {
+        val syntaxErrors = syntaxAnalyzer.getSyntaxErrors()
+        errors.addAll(syntaxErrors)
+    }
+
+    return Pair(Pair(tokens, vars), errors)
 }
 
 class SyntaxAnalyzer(private val tokens: List<Token>) {
 
+    private val stack = Stack<ProductionRule>()
     private var index = 0
+    private val syntaxErrors = mutableListOf<String>()
 
     fun parse(): Boolean {
+        stack.push(ProductionRule.PROGRAMA)
         return programa()
     }
 
     private fun programa(): Boolean {
-        return if (inicio() && codigo() && fin()) {
-            true
-        } else {
-            false
+        if (!inicio()) {
+            reportSyntaxError(ProductionRule.INICIO, "Expected 'START' at the beginning of the program")
+            return false
         }
+
+        if (!codigo()) {
+            reportSyntaxError(ProductionRule.CODIGO, "Error in program code")
+            return false
+        }
+
+        if (!fin()) {
+            reportSyntaxError(ProductionRule.FIN, "Expected 'END' at the end of the program")
+            return false
+        }
+
+        if (!stack.isEmpty()) {
+            reportSyntaxError(ProductionRule.PROGRAMA, "Unexpected tokens after the end of the program")
+            return false
+        }
+
+        return true
     }
 
     private fun inicio(): Boolean {
-        return matchAndAdvance(TokenType.START)
+        if (matchAndAdvance(TokenType.START) && matchAndAdvance(TokenType.OPEN_CURLY_BRACE)) {
+            stack.push(ProductionRule.INICIO)
+            return true
+        }
+        reportSyntaxError(ProductionRule.INICIO, "Expected 'START' at the beginning of the program")
+        return false
     }
 
     private fun fin(): Boolean {
-        return matchAndAdvance(TokenType.END)
+        if (matchAndAdvance(TokenType.CLOSE_CURLY_BRACE) && matchAndAdvance(TokenType.END)) {
+            stack.push(ProductionRule.FIN)
+            return true
+        }
+        return false
     }
 
     private fun codigo(): Boolean {
-        return if (instruccion()) {
-            while (instruccion()) {}
-            true
-        } else {
-            false
-        }
+        stack.push(ProductionRule.CODIGO)
+        return instruccion()
     }
 
     private fun instruccion(): Boolean {
+        stack.push(ProductionRule.INSTRUCCION)
         return when {
             texto() -> true
             operacion() -> true
@@ -338,91 +387,113 @@ class SyntaxAnalyzer(private val tokens: List<Token>) {
         }
     }
 
-    private fun texto(): Boolean {
-        return if (funcion() && parametrosTexto()) {
-            true
-        } else {
-            false
+    private fun declaracion(): Boolean {
+        stack.push(ProductionRule.DECLARACION)
+        return tipoDeclaracion() && valoresDeclaracion() && stack.pop() == ProductionRule.DECLARACION
+    }
+
+    private fun tipoDeclaracion(): Boolean {
+        if (matchAndAdvance(TokenType.TYPE_INTEGER) || matchAndAdvance(TokenType.TYPE_FLOAT)) {
+            stack.push(ProductionRule.TIPO_DECLARACION)
+            return true
         }
+        reportSyntaxError(ProductionRule.TIPO_DECLARACION, "Expected data type for declaration")
+        return false
+    }
+
+    private fun valoresDeclaracion(): Boolean {
+        if (valorDeclaracion()) {
+            stack.push(ProductionRule.VALORES_DECLARACION)
+            return true
+        }
+        reportSyntaxError(ProductionRule.VALORES_DECLARACION, "Expected values for declaration")
+        return false
+    }
+
+    private fun valorDeclaracion(): Boolean {
+        stack.push(ProductionRule.VALOR_DECLARACION)
+        return matchAndAdvance(TokenType.IDENTIFIER) || asignacion()
+    }
+
+    private fun asignacion(): Boolean {
+        stack.push(ProductionRule.ASIGNACION)
+        return matchAndAdvance(TokenType.IDENTIFIER) && matchAndAdvance(TokenType.DESIGNATOR) &&
+                valorAsignado() && stack.pop() == ProductionRule.ASIGNACION
+    }
+
+    private fun valorAsignado(): Boolean {
+        stack.push(ProductionRule.VALOR_ASIGNADO)
+        return matchAndAdvance(TokenType.INTEGER) || matchAndAdvance(TokenType.FLOAT) || operacion()
+    }
+
+    private fun texto(): Boolean {
+        stack.push(ProductionRule.TEXTO)
+        return funcion() && parametrosTexto() && stack.pop() == ProductionRule.TEXTO
     }
 
     private fun funcion(): Boolean {
-        return matchAndAdvance(TokenType.OP_READ) || matchAndAdvance(TokenType.OP_WRITE)
+        if (matchAndAdvance(TokenType.OP_READ) || matchAndAdvance(TokenType.OP_WRITE)) {
+            stack.push(ProductionRule.FUNCION)
+            return true
+        }
+        reportSyntaxError(ProductionRule.FUNCION, "Expected 'READ' or 'WRITE' function")
+        return false
     }
 
     private fun parametrosTexto(): Boolean {
-        return matchAndAdvance(TokenType.OPEN_PARENTHESES) && matchAndAdvance(TokenType.IDENTIFIER) && matchAndAdvance(
-            TokenType.CLOSE_PARENTHESES
-        )
+        if (matchAndAdvance(TokenType.OPEN_PARENTHESES) && matchAndAdvance(TokenType.IDENTIFIER) && matchAndAdvance(
+                TokenType.CLOSE_PARENTHESES
+            )
+        ) {
+            stack.push(ProductionRule.PARAMETROS_TEXTO)
+            return true
+        }
+        reportSyntaxError(ProductionRule.PARAMETROS_TEXTO, "Expected parameter for text function")
+        return false
     }
 
     private fun operacion(): Boolean {
-        return if (tipoOperacion() && parametrosOperacion()) {
-            true
-        } else {
-            false
-        }
+        stack.push(ProductionRule.OPERACION)
+        return tipoOperacion() && parametrosOperacion() && stack.pop() == ProductionRule.OPERACION
     }
 
     private fun tipoOperacion(): Boolean {
-        return matchAndAdvance(TokenType.OP_SUM) || matchAndAdvance(TokenType.OP_RES) ||
-                matchAndAdvance(TokenType.OP_MUL) || matchAndAdvance(TokenType.OP_DIV)
+        if (matchAndAdvance(TokenType.OP_SUM) || matchAndAdvance(TokenType.OP_RES) ||
+            matchAndAdvance(TokenType.OP_MUL) || matchAndAdvance(TokenType.OP_DIV)
+        ) {
+            stack.push(ProductionRule.TIPO_OPERACION)
+            return true
+        }
+        reportSyntaxError(ProductionRule.TIPO_OPERACION, "Expected operator type for operation")
+        return false
     }
 
     private fun parametrosOperacion(): Boolean {
-        return matchAndAdvance(TokenType.OPEN_PARENTHESES) && valores() && matchAndAdvance(TokenType.CLOSE_PARENTHESES)
+        if (matchAndAdvance(TokenType.OPEN_PARENTHESES) && valores() && matchAndAdvance(TokenType.CLOSE_PARENTHESES)) {
+            stack.push(ProductionRule.PARAMETROS_OPERACION)
+            return true
+        }
+        reportSyntaxError(ProductionRule.PARAMETROS_OPERACION, "Expected parameters for operation")
+        return false
     }
 
     private fun valores(): Boolean {
-        return if (valorOperacion() && matchAndAdvance(TokenType.COMA) && valorOperacion()) {
-            true
-        } else {
-            false
-        }
+        stack.push(ProductionRule.VALORES)
+        return valorOperacion() && matchAndAdvance(TokenType.COMA) && valorOperacion() && stack.pop() == ProductionRule.VALORES
     }
 
     private fun valorOperacion(): Boolean {
+        stack.push(ProductionRule.VALOR_OPERACION)
         return matchAndAdvance(TokenType.IDENTIFIER) || matchAndAdvance(TokenType.INTEGER) ||
                 matchAndAdvance(TokenType.FLOAT) || operacion()
     }
 
-    private fun asignacion(): Boolean {
-        return if (matchAndAdvance(TokenType.IDENTIFIER) && matchAndAdvance(TokenType.DESIGNATOR) &&
-            valorAsignado()
-        ) {
-            true
-        } else {
-            false
-        }
+    private fun reportSyntaxError(rule: ProductionRule, message: String) {
+        syntaxErrors.add("Syntax error at index $index in $rule: $message")
     }
 
-    private fun valorAsignado(): Boolean {
-        return matchAndAdvance(TokenType.INTEGER) || matchAndAdvance(TokenType.FLOAT) || operacion()
-    }
-
-    private fun declaracion(): Boolean {
-        return if (tipoDeclaracion() && valoresDeclaracion()) {
-            true
-        } else {
-            false
-        }
-    }
-
-    private fun tipoDeclaracion(): Boolean {
-        return matchAndAdvance(TokenType.TYPE_INTEGER) || matchAndAdvance(TokenType.TYPE_FLOAT)
-    }
-
-    private fun valoresDeclaracion(): Boolean {
-        return if (valorDeclaracion()) {
-            while (matchAndAdvance(TokenType.COMA) && valorDeclaracion()) {}
-            true
-        } else {
-            false
-        }
-    }
-
-    private fun valorDeclaracion(): Boolean {
-        return matchAndAdvance(TokenType.IDENTIFIER) || asignacion()
+    fun getSyntaxErrors(): List<String> {
+        return syntaxErrors
     }
 
     private fun matchAndAdvance(expectedType: TokenType): Boolean {
@@ -434,6 +505,7 @@ class SyntaxAnalyzer(private val tokens: List<Token>) {
         }
     }
 }
+
 
 fun save(codeText: MutableState<TextFieldValue>, tokens: List<Token>, vars: List<String>): String {
     val fileChooser = JFileChooser()
