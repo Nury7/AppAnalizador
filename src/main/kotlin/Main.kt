@@ -40,7 +40,6 @@ import javax.swing.JScrollPane
 import javax.swing.JTable
 import javax.swing.filechooser.FileNameExtensionFilter
 import kotlin.system.exitProcess
-import java.util.Stack
 
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -129,7 +128,7 @@ fun App() {
             modifier = Modifier.fillMaxSize().wrapContentWidth(align = Alignment.End)
         ) {
             Button(onClick = {
-                val lists = analyze(codeText.value.text)
+                val lists = lexicalAnalyze(codeText.value.text)
                 tokens = lists.first.first
                 vars = lists.first.second
                 val errors = lists.second
@@ -275,7 +274,7 @@ fun App() {
     }
 }
 
-fun analyze(sourceCode: String): Pair<Pair<List<Token>, List<String>>, List<String>> {
+fun lexicalAnalyze(sourceCode: String): Pair<Pair<List<Token>, List<String>>, List<String>> {
     val stringTokenizer = StringTokenizer(sourceCode, "{}();,=\n\t ", true)
     val tokens = mutableListOf<Token>()
     val vars = mutableListOf<String>()
@@ -308,169 +307,88 @@ fun analyze(sourceCode: String): Pair<Pair<List<Token>, List<String>>, List<Stri
         }
     }
 
-    val syntaxAnalyzer = SyntaxAnalyzer(tokens)
-
-    val syntaxAnalysisResult = syntaxAnalyzer.parse()
-    if (!syntaxAnalysisResult) {
-        val syntaxErrors = syntaxAnalyzer.getSyntaxErrors()
-        errors.addAll(syntaxErrors)
-    }
-
     return Pair(Pair(tokens, vars), errors)
 }
 
-class SyntaxAnalyzer(private val tokens: List<Token>) {
+fun syntaxAnalyze(tokens: List<Token>): List<String> {
+    val errors = mutableListOf<String>()
 
-    private val stack = Stack<ProductionRule>()
-    private var index = 0
-    private val syntaxErrors = mutableListOf<String>()
+    val iterator = tokens.iterator()
+    val tokenStack = mutableListOf<Token>()
 
-    fun parse(): Boolean {
-        stack.push(ProductionRule.PROGRAMA)
-        val isParsed = programa() && index == tokens.size
-        if (!isParsed) {
-            reportSyntaxError(ProductionRule.PROGRAMA, "Error in parsing program")
-        }
-        return isParsed
-    }
-
-    private fun programa(): Boolean {
-        return inicio() && codigo() && fin()
-    }
-
-    private fun inicio(): Boolean {
-        return matchAndAdvance(TokenType.START) && matchAndAdvance(TokenType.OPEN_CURLY_BRACE)
-    }
-
-    private fun fin(): Boolean {
-        return matchAndAdvance(TokenType.CLOSE_CURLY_BRACE) && matchAndAdvance(TokenType.END)
-    }
-
-    private fun codigo(): Boolean {
-        stack.push(ProductionRule.CODIGO)
-        while (instruccion()) {
-
-        }
-        stack.pop()
-        return true
-    }
-
-    private fun instruccion(): Boolean {
-        stack.push(ProductionRule.INSTRUCCION)
-        return when {
-            texto() -> true
-            operacion() -> true
-            declaracion() -> true
-            asignacion() -> true
-            else -> false
-        }
-    }
-
-    private fun declaracion(): Boolean {
-        stack.push(ProductionRule.DECLARACION)
-        return tipoDeclaracion() && valoresDeclaracion() && stack.pop() == ProductionRule.DECLARACION
-    }
-
-    private fun tipoDeclaracion(): Boolean {
-        return matchAndAdvance(TokenType.TYPE_INTEGER) || matchAndAdvance(TokenType.TYPE_FLOAT)
-    }
-
-    private fun valoresDeclaracion(): Boolean {
-        stack.push(ProductionRule.VALORES_DECLARACION)
-        if (valorDeclaracion()) {
-            while (matchAndAdvance(TokenType.COMA)) {
-                if (!valorDeclaracion()) {
-                    reportSyntaxError(ProductionRule.VALORES_DECLARACION, "Expected values for declaration")
-                    return false
-                }
+    fun expect(tokenType: TokenType) {
+        if (iterator.hasNext()) {
+            val nextToken = iterator.next()
+            if (nextToken.type != tokenType) {
+                errors.add("Error: Expected token '${tokenType.pattern}', found '${nextToken.value}'")
             }
-        }
-        stack.pop()
-        return true
-    }
-
-    private fun valorDeclaracion(): Boolean {
-        stack.push(ProductionRule.VALOR_DECLARACION)
-        return matchAndAdvance(TokenType.IDENTIFIER) && (matchAndAdvance(TokenType.DOT_COMA) || asignacion() || parametrosOperacion() || matchAndAdvance(TokenType.COMA))
-    }
-
-    private fun asignacion(): Boolean {
-        stack.push(ProductionRule.ASIGNACION)
-        return matchAndAdvance(TokenType.IDENTIFIER) && matchAndAdvance(TokenType.DESIGNATOR) &&
-                valorAsignado() && stack.pop() == ProductionRule.ASIGNACION
-    }
-
-    private fun valorAsignado(): Boolean {
-        stack.push(ProductionRule.VALOR_ASIGNADO)
-        return matchAndAdvance(TokenType.INTEGER) || matchAndAdvance(TokenType.FLOAT) || operacion() || funcion() ||
-                (matchAndAdvance(TokenType.IDENTIFIER) && (matchAndAdvance(TokenType.DOT_COMA) || matchAndAdvance(TokenType.COMA) ||
-                        (matchAndAdvance(TokenType.DESIGNATOR) && valorAsignado())))
-    }
-
-
-    private fun texto(): Boolean {
-        stack.push(ProductionRule.TEXTO)
-        return funcion() && parametrosTexto() && stack.pop() == ProductionRule.TEXTO
-    }
-
-    private fun funcion(): Boolean {
-        return matchAndAdvance(TokenType.OP_READ) || matchAndAdvance(TokenType.OP_WRITE)
-    }
-
-    private fun parametrosTexto(): Boolean {
-        return matchAndAdvance(TokenType.OPEN_PARENTHESES) && (matchAndAdvance(TokenType.IDENTIFIER) || matchAndAdvance(TokenType.CLOSE_PARENTHESES))
-    }
-
-    private fun operacion(): Boolean {
-        stack.push(ProductionRule.OPERACION)
-        return tipoOperacion() && (parametrosOperacion() || valorOperacion()) && stack.pop() == ProductionRule.OPERACION
-    }
-
-    private fun tipoOperacion(): Boolean {
-        return matchAndAdvance(TokenType.OP_SUM) || matchAndAdvance(TokenType.OP_RES) ||
-                matchAndAdvance(TokenType.OP_MUL) || matchAndAdvance(TokenType.OP_DIV)
-    }
-
-    private fun parametrosOperacion(): Boolean {
-        return matchAndAdvance(TokenType.OPEN_PARENTHESES) && valores() && matchAndAdvance(TokenType.CLOSE_PARENTHESES)
-    }
-
-    private fun valores(): Boolean {
-        stack.push(ProductionRule.VALORES)
-        if (valorOperacion()) {
-            while (matchAndAdvance(TokenType.COMA)) {
-                if (!valorOperacion()) {
-                    reportSyntaxError(ProductionRule.VALORES, "Expected value after comma in operation")
-                    return false
-                }
-            }
-        }
-        stack.pop()
-        return true
-    }
-
-    private fun valorOperacion(): Boolean {
-        stack.push(ProductionRule.VALOR_OPERACION)
-        return (matchAndAdvance(TokenType.IDENTIFIER) || matchAndAdvance(TokenType.INTEGER) ||
-                matchAndAdvance(TokenType.FLOAT) || operacion() || funcion()) && stack.pop() == ProductionRule.VALOR_OPERACION
-    }
-
-    private fun reportSyntaxError(rule: ProductionRule, message: String) {
-        syntaxErrors.add("Syntax error at index $index in $rule: $message")
-    }
-
-    private fun matchAndAdvance(expectedType: TokenType): Boolean {
-        return if (index < tokens.size && tokens[index].type == expectedType) {
-            index++
-            true
         } else {
-            false
+            errors.add("Error: Unexpected end of input, expected token '${tokenType.pattern}'")
         }
     }
 
-    fun getSyntaxErrors(): List<String> {
-        return syntaxErrors
+    fun parseINICIO() {
+        expect(TokenType.START)
+        expect(TokenType.OPEN_CURLY_BRACE)
     }
+
+    fun parseASIGNACION() {
+    }
+
+    fun parseDECLARACION() {
+    }
+
+    fun parseTEXTO() {
+    }
+
+    fun parseINSTRUCCION() {
+        val currentToken = iterator.next()
+        when (currentToken.type) {
+            TokenType.IDENTIFIER -> parseASIGNACION()
+            TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT -> parseDECLARACION()
+            TokenType.OP_READ, TokenType.OP_WRITE -> parseTEXTO()
+            else -> {
+                errors.add("Error: Unexpected token '${currentToken.value}'")
+                return
+            }
+        }
+    }
+
+    fun parseCODIGO() {
+        while (iterator.hasNext()) {
+            val nextToken = iterator.next()
+            tokenStack.add(nextToken)
+            when (nextToken.type) {
+                TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT, TokenType.OP_READ, TokenType.OP_WRITE,
+                TokenType.IDENTIFIER -> parseINSTRUCCION()
+                TokenType.CLOSE_CURLY_BRACE -> return
+                else -> {
+                    errors.add("Error: Unexpected token '${nextToken.value}'")
+                    return
+                }
+            }
+        }
+    }
+
+    fun parseFIN(){
+        expect(TokenType.START)
+        expect(TokenType.OPEN_CURLY_BRACE)
+    }
+
+    fun parsePROGRAMA() {
+        parseINICIO()
+        parseCODIGO()
+        parseFIN()
+        expect(TokenType.END)
+    }
+
+    parsePROGRAMA()
+
+    if (iterator.hasNext()) {
+        errors.add("Error: Unexpected token '${iterator.next().value}'")
+    }
+
+    return errors
 }
 
 
