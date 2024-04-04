@@ -312,9 +312,7 @@ fun lexicalAnalyze(sourceCode: String): Pair<Pair<List<Token>, List<String>>, Li
 
 fun syntaxAnalyze(tokens: List<Token>): List<String> {
     val errors = mutableListOf<String>()
-
     val iterator = tokens.iterator()
-    val tokenStack = mutableListOf<Token>()
 
     fun expect(tokenType: TokenType) {
         if (iterator.hasNext()) {
@@ -333,12 +331,39 @@ fun syntaxAnalyze(tokens: List<Token>): List<String> {
     }
 
     fun parseASIGNACION() {
+        expect(TokenType.IDENTIFIER)
+        expect(TokenType.DESIGNATOR)
+        if (iterator.hasNext() && iterator.next().type in listOf(TokenType.INTEGER, TokenType.FLOAT)) {
+            expect(TokenType.INTEGER)
+        } else {
+            expect(TokenType.IDENTIFIER)
+        }
+        expect(TokenType.DOT_COMA)
     }
 
     fun parseDECLARACION() {
+        val type = iterator.next().type
+        if (type in listOf(TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT)) {
+            expect(TokenType.IDENTIFIER)
+            if (iterator.hasNext() && iterator.next().type == TokenType.DESIGNATOR) {
+                expect(TokenType.INTEGER)
+            }
+            expect(TokenType.DOT_COMA)
+        } else {
+            errors.add("Error: Unexpected token '${type.pattern}', expected 'TYPE_INTEGER' or 'TYPE_FLOAT'")
+        }
     }
 
     fun parseTEXTO() {
+        val type = iterator.next().type
+        if (type in listOf(TokenType.OP_READ, TokenType.OP_WRITE)) {
+            expect(TokenType.OPEN_PARENTHESES)
+            expect(TokenType.IDENTIFIER)
+            expect(TokenType.CLOSE_PARENTHESES)
+            expect(TokenType.DOT_COMA)
+        } else {
+            errors.add("Error: Unexpected token '${type.pattern}', expected 'OP_READ' or 'OP_WRITE'")
+        }
     }
 
     fun parseINSTRUCCION() {
@@ -357,7 +382,6 @@ fun syntaxAnalyze(tokens: List<Token>): List<String> {
     fun parseCODIGO() {
         while (iterator.hasNext()) {
             val nextToken = iterator.next()
-            tokenStack.add(nextToken)
             when (nextToken.type) {
                 TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT, TokenType.OP_READ, TokenType.OP_WRITE,
                 TokenType.IDENTIFIER -> parseINSTRUCCION()
@@ -371,15 +395,13 @@ fun syntaxAnalyze(tokens: List<Token>): List<String> {
     }
 
     fun parseFIN(){
-        expect(TokenType.START)
-        expect(TokenType.OPEN_CURLY_BRACE)
+        expect(TokenType.END)
     }
 
     fun parsePROGRAMA() {
         parseINICIO()
         parseCODIGO()
         parseFIN()
-        expect(TokenType.END)
     }
 
     parsePROGRAMA()
