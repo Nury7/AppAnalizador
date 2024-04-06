@@ -1,0 +1,124 @@
+fun syntaxAnalyze(tokens: List<Token>): List<String> {
+    val errors = mutableListOf<String>()
+    val iterator = tokens.iterator()
+
+    fun expect(vararg expectedTypes: TokenType) {
+        if (iterator.hasNext()) {
+            val nextToken = iterator.next()
+            if (nextToken.type !in expectedTypes) {
+                val expectedTokens = expectedTypes.joinToString(", ") { it.pattern }
+                errors.add("Error: Expected one of the tokens '$expectedTokens', found '${nextToken.value}'")
+            }
+        } else {
+            val expectedTokens = expectedTypes.joinToString(", ") { it.pattern }
+            errors.add("Error: Unexpected end of input, expected one of the tokens '$expectedTokens'")
+        }
+    }
+
+
+    fun parseINICIO() {
+        expect(TokenType.START)
+        expect(TokenType.OPEN_CURLY_BRACE)
+    }
+
+    fun parseFIN(){
+        expect(TokenType.CLOSE_CURLY_BRACE)
+        expect(TokenType.END)
+    }
+
+    fun parseASIGNACION() {
+        expect(TokenType.IDENTIFIER)
+        expect(TokenType.DESIGNATOR)
+        if (iterator.hasNext() && iterator.next().type in listOf(TokenType.INTEGER, TokenType.FLOAT)) {
+            expect(TokenType.INTEGER)
+        } else {
+            expect(TokenType.IDENTIFIER)
+        }
+    }
+
+    fun parseVALORDECLARACION() {
+        while (iterator.hasNext()) {
+            val currentToken = iterator.next()
+            when (currentToken.type) {
+                TokenType.IDENTIFIER -> {
+                    if (iterator.hasNext() && iterator.next().type == TokenType.COMA) {
+                        continue
+                    }
+                }
+                TokenType.INTEGER, TokenType.FLOAT -> {
+                }
+                else -> {
+                    errors.add("Error: Unexpected token '${currentToken.value}' in declaration")
+                }
+            }
+            break
+        }
+    }
+
+    fun parseVALORESDECLARACION() {
+        parseVALORDECLARACION()
+        if (iterator.hasNext() && iterator.next().type == TokenType.COMA) {
+            parseVALORESDECLARACION()
+        }
+    }
+
+    fun parseDECLARACION() {
+        expect(TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT)
+        parseVALORESDECLARACION()
+        expect(TokenType.DOT_COMA)
+    }
+
+    fun parseTEXTO() {
+        val type = iterator.next().type
+        if (type in listOf(TokenType.OP_READ, TokenType.OP_WRITE)) {
+            expect(TokenType.OPEN_PARENTHESES)
+            expect(TokenType.IDENTIFIER)
+            expect(TokenType.CLOSE_PARENTHESES)
+        } else {
+            errors.add("Error: Unexpected token '${type.pattern}', expected 'OP_READ' or 'OP_WRITE'")
+        }
+    }
+
+    fun parseINSTRUCCION() {
+        val currentToken = iterator.next()
+        when (currentToken.type) {
+            TokenType.OP_READ, TokenType.OP_WRITE -> parseTEXTO()
+            TokenType.IDENTIFIER -> parseASIGNACION()
+            TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT -> parseDECLARACION()
+            else -> {
+                errors.add("Error: Unexpected token '${currentToken.value}'")
+                return
+            }
+        }
+        expect(TokenType.DOT_COMA)
+    }
+
+    fun parseCODIGO(){
+        while (iterator.hasNext()) {
+            val nextToken = iterator.next()
+            when (nextToken.type) {
+                TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT, TokenType.OP_READ, TokenType.OP_WRITE,
+                TokenType.IDENTIFIER -> parseINSTRUCCION()
+                TokenType.CLOSE_CURLY_BRACE -> return
+                else -> {
+                    errors.add("Error: Unexpected token '${nextToken.value}'")
+                    return
+                }
+            }
+        }
+    }
+
+    fun parsePROGRAMA() {
+        parseINICIO()
+        parseCODIGO()
+        parseFIN()
+    }
+
+    parsePROGRAMA()
+
+    if (iterator.hasNext()) {
+        errors.add("Error: Unexpected token '${iterator.next().value}'")
+    }
+
+    return errors
+}
