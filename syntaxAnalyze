@@ -1,20 +1,23 @@
 fun syntaxAnalyze(tokens: List<Token>): List<String> {
     val errors = mutableListOf<String>()
     val iterator = tokens.iterator()
+    var currentToken = iterator.next()
 
     fun expect(vararg expectedTypes: TokenType) {
         if (iterator.hasNext()) {
-            val nextToken = iterator.next()
-            if (nextToken.type !in expectedTypes) {
+            if (currentToken.type !in expectedTypes) {
                 val expectedTokens = expectedTypes.joinToString(", ") { it.pattern }
-                errors.add("Error: Expected one of the tokens '$expectedTokens', found '${nextToken.value}'")
+                errors.add("Error: Expected one of the tokens '$expectedTokens', found '${currentToken.value}'")
             }
+            currentToken = iterator.next()
         } else {
-            val expectedTokens = expectedTypes.joinToString(", ") { it.pattern }
-            errors.add("Error: Unexpected end of input, expected one of the tokens '$expectedTokens'")
-        }
-    }
+            if (currentToken.type != TokenType.END) {
+                val expectedTokens = expectedTypes.joinToString(", ") { it.pattern }
+                errors.add("Error: Unexpected end of input, expected one of the tokens '$expectedTokens'")
+            }
+            }
 
+    }
 
     fun parseINICIO() {
         expect(TokenType.START)
@@ -26,24 +29,46 @@ fun syntaxAnalyze(tokens: List<Token>): List<String> {
         expect(TokenType.END)
     }
 
-    fun parseASIGNACION() {
-        expect(TokenType.IDENTIFIER)
-        expect(TokenType.DESIGNATOR)
-        if (iterator.hasNext() && iterator.next().type in listOf(TokenType.INTEGER, TokenType.FLOAT)) {
-            expect(TokenType.INTEGER)
-        } else {
-            expect(TokenType.IDENTIFIER)
+    fun parseVALOROPERACION() {
+        currentToken = iterator.next()
+        when (currentToken.type) {
+            TokenType.IDENTIFIER, TokenType.INTEGER, TokenType.FLOAT -> { }
+            TokenType.OP_SUM, TokenType.OP_RES, TokenType.OP_MUL, TokenType.OP_DIV -> { }
+            else -> {
+                errors.add("Error: Unexpected token '${currentToken.value}' in operation")
+            }
+        }
+    }
+
+    fun parseVALORES() {
+        parseVALOROPERACION()
+        while (iterator.hasNext() && iterator.next().type == TokenType.COMA) {
+            parseVALOROPERACION()
+        }
+    }
+
+    fun parseOPERACION() {
+        if (currentToken.type in listOf(TokenType.OP_SUM, TokenType.OP_RES, TokenType.OP_MUL, TokenType.OP_DIV)) {
+            if (iterator.hasNext() && iterator.next().type == TokenType.OPEN_PARENTHESES) {
+                parseVALORES()
+                if (iterator.hasNext() && iterator.next().type == TokenType.CLOSE_PARENTHESES) {
+                    return
+                }
+            }
         }
     }
 
     fun parseVALORDECLARACION() {
         while (iterator.hasNext()) {
-            val currentToken = iterator.next()
+            currentToken = iterator.next()
             when (currentToken.type) {
                 TokenType.IDENTIFIER -> {
+                    expect(TokenType.IDENTIFIER)
                     if (iterator.hasNext() && iterator.next().type == TokenType.COMA) {
+                        expect(TokenType.COMA)
                         continue
                     }
+                    if (iterator.next().type == TokenType.DOT_COMA) break
                 }
                 TokenType.INTEGER, TokenType.FLOAT -> {
                 }
@@ -65,44 +90,52 @@ fun syntaxAnalyze(tokens: List<Token>): List<String> {
     fun parseDECLARACION() {
         expect(TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT)
         parseVALORESDECLARACION()
-        expect(TokenType.DOT_COMA)
     }
 
-    fun parseTEXTO() {
-        val type = iterator.next().type
-        if (type in listOf(TokenType.OP_READ, TokenType.OP_WRITE)) {
-            expect(TokenType.OPEN_PARENTHESES)
-            expect(TokenType.IDENTIFIER)
-            expect(TokenType.CLOSE_PARENTHESES)
-        } else {
-            errors.add("Error: Unexpected token '${type.pattern}', expected 'OP_READ' or 'OP_WRITE'")
+    fun parseASIGNACION() {
+        expect(TokenType.DESIGNATOR)
+        when (currentToken.type) {
+            TokenType.INTEGER ->  expect(TokenType.INTEGER)
+            TokenType.FLOAT -> expect(TokenType.FLOAT)
+            else -> parseOPERACION()
         }
     }
 
+    fun parseTEXTO() {
+        currentToken = iterator.next()
+            expect(TokenType.OPEN_PARENTHESES)
+            expect(TokenType.IDENTIFIER)
+            expect(TokenType.CLOSE_PARENTHESES)
+    }
+
     fun parseINSTRUCCION() {
-        val currentToken = iterator.next()
         when (currentToken.type) {
             TokenType.OP_READ, TokenType.OP_WRITE -> parseTEXTO()
-            TokenType.IDENTIFIER -> parseASIGNACION()
+            TokenType.IDENTIFIER -> {
+                currentToken = iterator.next()
+                if (currentToken.type == TokenType.DESIGNATOR) parseASIGNACION()
+            }
             TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT -> parseDECLARACION()
+            TokenType.OP_SUM, TokenType.OP_RES, TokenType.OP_MUL, TokenType.OP_DIV -> parseOPERACION()
             else -> {
                 errors.add("Error: Unexpected token '${currentToken.value}'")
                 return
             }
         }
+        print("Hola")
         expect(TokenType.DOT_COMA)
     }
 
     fun parseCODIGO(){
         while (iterator.hasNext()) {
-            val nextToken = iterator.next()
-            when (nextToken.type) {
+            when (currentToken.type) {
                 TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT, TokenType.OP_READ, TokenType.OP_WRITE,
+                TokenType.OP_SUM, TokenType.OP_RES, TokenType.OP_MUL, TokenType.OP_DIV,
                 TokenType.IDENTIFIER -> parseINSTRUCCION()
                 TokenType.CLOSE_CURLY_BRACE -> return
                 else -> {
-                    errors.add("Error: Unexpected token '${nextToken.value}'")
-                    return
+                    errors.add("Error: Unexpected token '${currentToken.value}'")
+                    currentToken = iterator.next()
                 }
             }
         }
