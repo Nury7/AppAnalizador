@@ -319,29 +319,21 @@ fun lexicalAnalyze(sourceCode: String): Pair<Pair<List<Token>, List<String>>, Li
 
 fun syntaxAnalyze(tokens: List<Token>): List<String> {
     val errors = mutableListOf<String>()
-    val stack = Stack<ProductionRule>()
+    val stack = Stack<String>()
 
     for (token in tokens) {
-        val topProductionRule = if (stack.isNotEmpty()) stack.peek() else null
-
         val matchingProductionRule = ProductionRules.getMatchingProductionRule(token)
 
         if (matchingProductionRule != null) {
-            if (topProductionRule != null && topProductionRule.tokens.contains(token)) {
-                continue
-            } else {
-                errors.add("Error: Token '${token.type.pattern}' inesperado")
-            }
+            stack.push(matchingProductionRule.name)
         } else {
             errors.add("Error: Token '${token.type.pattern}' inesperado")
         }
 
-        if (errors.isNotEmpty()) {
-            break
-        }
     }
 
     if (stack.isNotEmpty()) {
+        println(stack.toString())
         errors.add("Error: Estructura incorrecta del programa")
     }
 
