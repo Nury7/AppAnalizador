@@ -33,7 +33,8 @@ import androidx.compose.ui.window.application
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.io.File
-import java.util.*
+import java.util.Stack
+import java.util.StringTokenizer
 import javax.swing.JFileChooser
 import javax.swing.JOptionPane
 import javax.swing.JScrollPane
@@ -131,13 +132,19 @@ fun App() {
                 val lists = lexicalAnalyze(codeText.value.text)
                 tokens = lists.first.first
                 vars = lists.first.second
-                val errors = lists.second
-                if (errors.isEmpty()) {
+
+                val lexicalErrors = lists.second
+
+                val syntaxErrors = syntaxAnalyze(tokens)
+
+                val allErrors = lexicalErrors + syntaxErrors
+
+                if (allErrors.isEmpty()) {
                     withoutErrors.value = true
-                    consoleText.value = TextFieldValue("SOURCE CODE WITHOUT ERRORS")
+                    consoleText.value = TextFieldValue("No errors found")
                 } else {
                     withoutErrors.value = false
-                    val concatenatedErrors = errors.joinToString("\n")
+                    val concatenatedErrors = allErrors.joinToString("\n")
                     consoleText.value = TextFieldValue(concatenatedErrors)
                 }
             },
@@ -312,107 +319,34 @@ fun lexicalAnalyze(sourceCode: String): Pair<Pair<List<Token>, List<String>>, Li
 
 fun syntaxAnalyze(tokens: List<Token>): List<String> {
     val errors = mutableListOf<String>()
-    val iterator = tokens.iterator()
+    val stack = Stack<ProductionRule>()
 
-    fun expect(tokenType: TokenType) {
-        if (iterator.hasNext()) {
-            val nextToken = iterator.next()
-            if (nextToken.type != tokenType) {
-                errors.add("Error: Expected token '${tokenType.pattern}', found '${nextToken.value}'")
+    for (token in tokens) {
+        val topProductionRule = if (stack.isNotEmpty()) stack.peek() else null
+
+        val matchingProductionRule = ProductionRules.getMatchingProductionRule(token)
+
+        if (matchingProductionRule != null) {
+            if (topProductionRule != null && topProductionRule.tokens.contains(token)) {
+                continue
+            } else {
+                errors.add("Error: Token '${token.type.pattern}' inesperado")
             }
         } else {
-            errors.add("Error: Unexpected end of input, expected token '${tokenType.pattern}'")
+            errors.add("Error: Token '${token.type.pattern}' inesperado")
+        }
+
+        if (errors.isNotEmpty()) {
+            break
         }
     }
 
-    fun parseINICIO() {
-        expect(TokenType.START)
-        expect(TokenType.OPEN_CURLY_BRACE)
-    }
-
-    fun parseASIGNACION() {
-        expect(TokenType.IDENTIFIER)
-        expect(TokenType.DESIGNATOR)
-        if (iterator.hasNext() && iterator.next().type in listOf(TokenType.INTEGER, TokenType.FLOAT)) {
-            expect(TokenType.INTEGER)
-        } else {
-            expect(TokenType.IDENTIFIER)
-        }
-        expect(TokenType.DOT_COMA)
-    }
-
-    fun parseDECLARACION() {
-        val type = iterator.next().type
-        if (type in listOf(TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT)) {
-            expect(TokenType.IDENTIFIER)
-            if (iterator.hasNext() && iterator.next().type == TokenType.DESIGNATOR) {
-                expect(TokenType.INTEGER)
-            }
-            expect(TokenType.DOT_COMA)
-        } else {
-            errors.add("Error: Unexpected token '${type.pattern}', expected 'TYPE_INTEGER' or 'TYPE_FLOAT'")
-        }
-    }
-
-    fun parseTEXTO() {
-        val type = iterator.next().type
-        if (type in listOf(TokenType.OP_READ, TokenType.OP_WRITE)) {
-            expect(TokenType.OPEN_PARENTHESES)
-            expect(TokenType.IDENTIFIER)
-            expect(TokenType.CLOSE_PARENTHESES)
-            expect(TokenType.DOT_COMA)
-        } else {
-            errors.add("Error: Unexpected token '${type.pattern}', expected 'OP_READ' or 'OP_WRITE'")
-        }
-    }
-
-    fun parseINSTRUCCION() {
-        val currentToken = iterator.next()
-        when (currentToken.type) {
-            TokenType.IDENTIFIER -> parseASIGNACION()
-            TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT -> parseDECLARACION()
-            TokenType.OP_READ, TokenType.OP_WRITE -> parseTEXTO()
-            else -> {
-                errors.add("Error: Unexpected token '${currentToken.value}'")
-                return
-            }
-        }
-    }
-
-    fun parseCODIGO() {
-        while (iterator.hasNext()) {
-            val nextToken = iterator.next()
-            when (nextToken.type) {
-                TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT, TokenType.OP_READ, TokenType.OP_WRITE,
-                TokenType.IDENTIFIER -> parseINSTRUCCION()
-                TokenType.CLOSE_CURLY_BRACE -> return
-                else -> {
-                    errors.add("Error: Unexpected token '${nextToken.value}'")
-                    return
-                }
-            }
-        }
-    }
-
-    fun parseFIN(){
-        expect(TokenType.END)
-    }
-
-    fun parsePROGRAMA() {
-        parseINICIO()
-        parseCODIGO()
-        parseFIN()
-    }
-
-    parsePROGRAMA()
-
-    if (iterator.hasNext()) {
-        errors.add("Error: Unexpected token '${iterator.next().value}'")
+    if (stack.isNotEmpty()) {
+        errors.add("Error: Estructura incorrecta del programa")
     }
 
     return errors
 }
-
 
 fun save(codeText: MutableState<TextFieldValue>, tokens: List<Token>, vars: List<String>): String {
     val fileChooser = JFileChooser()
