@@ -319,143 +319,49 @@ fun lexicalAnalyze(sourceCode: String): Pair<Pair<List<Token>, List<String>>, Li
 
 fun syntaxAnalyze(tokens: List<Token>): List<String> {
     val errors = mutableListOf<String>()
-    val stack = Stack<String>()
+    val stack = Stack<ProductionRule>()
 
     for (token in tokens) {
         val matchingProductionRule = ProductionRules.getMatchingProductionRule(token)
-        if (!applyStartProductionRule(tokens)) {
-            errors.add("Error: La estructura del programa no comienza correctamente")
-        }else{
-            print("La estructura esta correcta")
-        }
-
-        if (!applyEndProductionRule(tokens)) {
-            errors.add("Error: La estructura del programa no Finaliza correctamente")
-        }else{
-            print("La estructura esta correcta")
-        }
-
-        if (!applyTypeDeclarationProductionRule(tokens)) {
-            errors.add("Error: Tipo de variable no declarado correctamente")
-        }else{
-            print("La estructura esta correcta")
-        }
-
-//        if (!applyProgramProductionRule(tokens)) {
-//            errors.add("Error: Tipo de variable no declarado correctamente")
-//        }else{
-//            print("La estructura esta correcta")
-//        }
-
-        if (!applyCodeProductionRule(tokens)) {
-            errors.add("Error: Sin codigo")
-        }else{
-            print("La estructura esta correcta")
-        }
-
 
         if (matchingProductionRule != null) {
-            stack.push(matchingProductionRule.name)
+            if (stack.isNotEmpty() && matchingProductionRule == stack.peek()) {
+                continue
+            }
+
+            if (stack.size >= 2 && stack.elementAt(stack.size - 2) == ProductionRules.FUNCION &&
+                stack.peek() == ProductionRules.PARAMETROS_TEXTO
+            ) {
+                stack.pop()
+                stack.pop()
+                stack.push(ProductionRules.TEXTO)
+            } else if ((matchingProductionRule == ProductionRules.TEXTO ||
+                        matchingProductionRule == ProductionRules.OPERACION ||
+                        matchingProductionRule == ProductionRules.DECLARACION ||
+                        matchingProductionRule == ProductionRules.ASIGNACION) &&
+                (stack.isEmpty() || stack.peek() != ProductionRules.INSTRUCCION)
+            ) {
+                stack.push(ProductionRules.INSTRUCCION)
+            } else if (matchingProductionRule == ProductionRules.CODIGO && stack.peek() == ProductionRules.INSTRUCCION) {
+                stack.pop()
+                stack.push(ProductionRules.CODIGO)
+            } else {
+                stack.push(matchingProductionRule)
+            }
+            println("Stack: $stack")
+        } else {
+            errors.add("Error: Token '${token.value}' inesperado")
         }
+    }
+
+    if (stack.isNotEmpty()) {
+        errors.add("Error: Estructura incorrecta del programa")
     }
 
     return errors
 }
 
-fun applyStartProductionRule(tokens: List<Token>): Boolean {
-    val startProductionRule = ProductionRules.INICIO
 
-    for (i in startProductionRule.tokens.indices) {
-        if (i >= tokens.size || tokens[i].type != startProductionRule.tokens[i]) {
-            return false
-        }
-    }
-
-    return true
-}
-
-fun applyEndProductionRule(tokens: List<Token>): Boolean {
-    if (tokens.size < 2) {
-        return false
-    }
-
-    val lastToken = tokens.last()
-    val secondLastToken = tokens[tokens.size - 2]
-
-    return lastToken.type == TokenType.END && secondLastToken.type == TokenType.CLOSE_CURLY_BRACE
-}
-
-
-fun applyTypeDeclarationProductionRule(tokens: List<Token>): Boolean {
-
-    if (tokens.isEmpty()) {
-        return false
-    }
-
-    for (token in tokens) {
-        if (token.type == TokenType.TYPE_INTEGER || token.type == TokenType.TYPE_FLOAT) {
-            return true
-        }
-    }
-
-    return false
-}
-
-
-fun applyCodeProductionRule(tokens: List<Token>): Boolean {
-    if (tokens.isEmpty()) {
-        return false
-    }
-
-    var currentIndex = 0
-    while (currentIndex < tokens.size) {
-        val currentToken = tokens[currentIndex]
-
-        if (currentToken.type in ProductionRules.DECLARACION.tokens) {
-            currentIndex++
-        } else if (currentToken.type in ProductionRules.OPERACION.tokens) {
-            currentIndex++
-        } else if (currentToken.type in ProductionRules.PARAMETROS_TEXTO.tokens) {
-            currentIndex++
-        } else if (currentToken.type == ProductionRules.CODIGO.tokens.firstOrNull()) {
-            val codigoTokens = tokens.subList(currentIndex + 1, tokens.size)
-            val codigoValido = applyCodeProductionRule(codigoTokens)
-            if (!codigoValido) {
-                return false
-            }
-            currentIndex = tokens.size
-        } else {
-            return false
-        }
-    }
-
-    return true
-}
-
-fun applyProgramProductionRule(tokens: List<Token>): Boolean {
-    val inicioToken = ProductionRules.INICIO.tokens.firstOrNull()
-    val finToken = ProductionRules.FIN.tokens.firstOrNull()
-
-    if (tokens.isEmpty() || tokens.firstOrNull()?.type != inicioToken) {
-        return false
-    }
-
-    val finIndex = tokens.indexOfFirst { it.type == finToken }
-
-    if (finIndex == -1 || finIndex <= 1) {
-        return false
-    }
-
-    // Verifica si hay código entre el inicio y el fin
-    val codigoTokens = tokens.subList(1, finIndex)
-    if (codigoTokens.isEmpty()) {
-        return false
-    }
-
-    val codigoValido = applyCodeProductionRule(codigoTokens)
-
-    return codigoValido && tokens[finIndex].type == finToken
-}
 
 fun save(codeText: MutableState<TextFieldValue>, tokens: List<Token>, vars: List<String>): String {
     val fileChooser = JFileChooser()
