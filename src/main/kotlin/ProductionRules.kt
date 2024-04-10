@@ -1,9 +1,17 @@
 class ProductionRules {
+
     companion object {
 
-        private val VALOR_OPERACION =
-            ProductionRule("VALOR_OPERACION", listOf(TokenType.IDENTIFIER, TokenType.INTEGER, TokenType.FLOAT))
-        private val PARAMETROS_OPERACION = ProductionRule(
+         val VALOR_OPERACION = ProductionRule(
+                "VALOR_OPERACION",
+            listOf(
+                TokenType.IDENTIFIER,
+                TokenType.INTEGER,
+                TokenType.FLOAT
+            )
+        )
+
+        val PARAMETROS_OPERACION = ProductionRule(
             "PARAMETROS_OPERACION",
             listOf(
                 TokenType.OPEN_PARENTHESES,
@@ -13,41 +21,147 @@ class ProductionRules {
                 TokenType.CLOSE_PARENTHESES
             )
         )
-        private val TIPO_OPERACION = ProductionRule(
+
+         val TIPO_OPERACION = ProductionRule(
             "TIPO_OPERACION",
-            listOf(TokenType.OP_SUM, TokenType.OP_RES, TokenType.OP_MUL, TokenType.OP_DIV)
+            listOf(
+                TokenType.OP_SUM,
+                TokenType.OP_RES,
+                TokenType.OP_MUL,
+                TokenType.OP_DIV
+            )
         )
 
-        private val OPERACION = ProductionRule("OPERACION", listOf(TIPO_OPERACION, PARAMETROS_OPERACION))
+         val OPERACION = ProductionRule(
+            "OPERACION",
+            listOf(
+                TIPO_OPERACION,
+                PARAMETROS_OPERACION
+            )
+        )
 
-        private val VALOR_ASIGNADO = ProductionRule("VALOR_ASIGNADO", listOf(TokenType.INTEGER, TokenType.FLOAT, OPERACION))
-        private val ASIGNACION =
-            ProductionRule( "ASIGNACION", listOf(TokenType.IDENTIFIER, TokenType.DESIGNATOR, VALOR_ASIGNADO))
+        val VALOR_ASIGNADO = ProductionRule(
+            "VALOR_ASIGNADO",
+            listOf(
+                TokenType.INTEGER,
+                TokenType.FLOAT,
+                OPERACION
+            )
+        )
 
-        private val VALOR_DECLARACION = ProductionRule("VALOR_DECLARACION", listOf(TokenType.IDENTIFIER, ASIGNACION))
-        private val VALORES_DECLARACION =
-            ProductionRule("VALORES_DECLARACION", listOf(VALOR_DECLARACION, TokenType.COMA, VALOR_DECLARACION))
-        private val TIPO_DECLARACION = ProductionRule("TIPO_DECLARACION", listOf(TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT))
-        private val DECLARACION = ProductionRule("DECLARACION", listOf(TIPO_DECLARACION, VALORES_DECLARACION))
+         val ASIGNACION = ProductionRule(
+            "ASIGNACION",
+            listOf(
+                TokenType.IDENTIFIER,
+                TokenType.DESIGNATOR,
+                VALOR_ASIGNADO
+            )
+        )
+
+        val VALOR_DECLARACION = ProductionRule(
+            "VALOR_DECLARACION",
+            listOf(
+                TokenType.IDENTIFIER,
+                ASIGNACION
+            )
+        )
+
+         val VALORES_DECLARACION = ProductionRule(
+            "VALORES_DECLARACION",
+            listOf(
+                VALOR_DECLARACION,
+                TokenType.COMA,
+                VALOR_DECLARACION
+            )
+        )
+
+        val TIPO_DECLARACION = ProductionRule(
+            "TIPO_DECLARACION",
+            listOf(
+                TokenType.TYPE_INTEGER,
+                TokenType.TYPE_FLOAT
+            )
+        )
+
+        val DECLARACION = ProductionRule(
+            "DECLARACION",
+            listOf(
+                TIPO_DECLARACION,
+                VALORES_DECLARACION
+            )
+        )
 
         init {
             (OPERACION.tokens as MutableList)[1] = PARAMETROS_OPERACION
         }
 
-        private val PARAMETROS_TEXTO = ProductionRule(
+        val PARAMETROS_TEXTO = ProductionRule(
             "PARAMETROS_TEXTO",
-            listOf(TokenType.OPEN_PARENTHESES, TokenType.IDENTIFIER, TokenType.CLOSE_PARENTHESES)
+            listOf(
+                TokenType.OPEN_PARENTHESES,
+                TokenType.IDENTIFIER,
+                TokenType.CLOSE_PARENTHESES
+            )
         )
-        private val FUNCION = ProductionRule("FUNCION", listOf(TokenType.OP_READ, TokenType.OP_WRITE))
-        private val TEXTO = ProductionRule("TEXTO", listOf(FUNCION, PARAMETROS_TEXTO))
 
-        private val INSTRUCCION = ProductionRule("INSTRUCCION", listOf(TEXTO, OPERACION, DECLARACION, ASIGNACION))
+         val FUNCION = ProductionRule(
+            "FUNCION",
+            listOf(
+                TokenType.OP_READ,
+                TokenType.OP_WRITE
+            )
+        )
 
-        private val CODIGO = ProductionRule("CODIGO", listOf(INSTRUCCION, TokenType.DOT_COMA))
-        private val FIN = ProductionRule("FIN", listOf(TokenType.CLOSE_CURLY_BRACE, TokenType.END))
-        private val INICIO = ProductionRule("INICIO", listOf(TokenType.START, TokenType.OPEN_CURLY_BRACE))
+         val TEXTO = ProductionRule(
+            "TEXTO",
+            listOf(
+                FUNCION,
+                PARAMETROS_TEXTO
+            )
+        )
 
-        private val PROGRAMA = ProductionRule("PROGRAMA", listOf(INICIO, CODIGO, FIN))
+         val INSTRUCCION = ProductionRule(
+            "INSTRUCCION",
+            listOf(
+                TEXTO,
+                OPERACION,
+                DECLARACION,
+                ASIGNACION
+            )
+        )
+
+        val CODIGO = ProductionRule(
+            "CODIGO",
+            listOf(
+                INSTRUCCION,
+                TokenType.DOT_COMA
+            )
+        )
+
+        val FIN = ProductionRule(
+            "FIN",
+            listOf(
+                TokenType.CLOSE_CURLY_BRACE,
+                TokenType.END
+            )
+        )
+
+        val INICIO = ProductionRule(
+            "INICIO",
+            listOf(
+                TokenType.START,
+                TokenType.OPEN_CURLY_BRACE
+            )
+        )
+
+        private val PROGRAMA = ProductionRule(
+            "PROGRAMA",
+            listOf(
+                INICIO,
+                CODIGO,
+                FIN
+            )
+        )
 
         private fun checkStrictOrder(rule: ProductionRule): Boolean {
             return when (rule) {
