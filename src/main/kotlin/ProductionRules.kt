@@ -1,53 +1,36 @@
 class ProductionRules {
     companion object {
 
-        private val VALOR_OPERACION =
-            ProductionRule("VALOR_OPERACION", listOf(TokenType.IDENTIFIER, TokenType.INTEGER, TokenType.FLOAT))
-        private val PARAMETROS_OPERACION = ProductionRule(
-            "PARAMETROS_OPERACION",
-            listOf(
-                TokenType.OPEN_PARENTHESES,
-                VALOR_OPERACION,
-                TokenType.COMA,
-                VALOR_OPERACION,
-                TokenType.CLOSE_PARENTHESES
-            )
-        )
-        private val TIPO_OPERACION = ProductionRule(
-            "TIPO_OPERACION",
-            listOf(TokenType.OP_SUM, TokenType.OP_RES, TokenType.OP_MUL, TokenType.OP_DIV)
-        )
-
+        // Reglas de producción para operaciones
+        val VALOR_OPERACION = ProductionRule("VALOR_OPERACION", listOf(TokenType.IDENTIFIER, TokenType.INTEGER, TokenType.FLOAT))
+        val PARAMETROS_OPERACION = ProductionRule("PARAMETROS_OPERACION", listOf(TokenType.OPEN_PARENTHESES, VALOR_OPERACION, TokenType.COMA, VALOR_OPERACION, TokenType.CLOSE_PARENTHESES))
+        val TIPO_OPERACION = ProductionRule("TIPO_OPERACION", listOf(TokenType.OP_SUM, TokenType.OP_RES, TokenType.OP_MUL, TokenType.OP_DIV))
         val OPERACION = ProductionRule("OPERACION", listOf(TIPO_OPERACION, PARAMETROS_OPERACION))
+        val VALORES = ProductionRule("VALORES", listOf(VALOR_OPERACION, TokenType.COMA, VALOR_OPERACION))
 
-        private val VALOR_ASIGNADO = ProductionRule("VALOR_ASIGNADO", listOf(TokenType.INTEGER, TokenType.FLOAT, OPERACION))
-        val ASIGNACION =
-            ProductionRule( "ASIGNACION", listOf(TokenType.IDENTIFIER, TokenType.DESIGNATOR, VALOR_ASIGNADO))
+        // Reglas de producción para asignaciones
+        val VALOR_ASIGNADO = ProductionRule("VALOR_ASIGNADO", listOf(TokenType.INTEGER, TokenType.FLOAT, OPERACION))
+        val ASIGNACION = ProductionRule("ASIGNACION", listOf(TokenType.IDENTIFIER, TokenType.DESIGNATOR, VALOR_ASIGNADO))
 
-        private val VALOR_DECLARACION = ProductionRule("VALOR_DECLARACION", listOf(TokenType.IDENTIFIER, ASIGNACION))
-        private val VALORES_DECLARACION =
-            ProductionRule("VALORES_DECLARACION", listOf(VALOR_DECLARACION, TokenType.COMA, VALOR_DECLARACION))
-        private val TIPO_DECLARACION = ProductionRule("TIPO_DECLARACION", listOf(TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT))
+        // Reglas de producción para declaraciones
+        val VALOR_DECLARACION = ProductionRule("VALOR_DECLARACION", listOf(TokenType.IDENTIFIER, ASIGNACION))
+        val VALORES_DECLARACION = ProductionRule("VALORES_DECLARACION", listOf(VALOR_DECLARACION, TokenType.COMA, VALOR_DECLARACION))
+        val TIPO_DECLARACION = ProductionRule("TIPO_DECLARACION", listOf(TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT))
         val DECLARACION = ProductionRule("DECLARACION", listOf(TIPO_DECLARACION, VALORES_DECLARACION))
 
-        init {
-            (OPERACION.tokens as MutableList)[1] = PARAMETROS_OPERACION
-        }
-
-        val PARAMETROS_TEXTO = ProductionRule(
-            "PARAMETROS_TEXTO",
-            listOf(TokenType.OPEN_PARENTHESES, TokenType.IDENTIFIER, TokenType.CLOSE_PARENTHESES)
-        )
+        // Reglas de producción para texto
+        val PARAMETROS_TEXTO = ProductionRule("PARAMETROS_TEXTO", listOf(TokenType.OPEN_PARENTHESES, TokenType.IDENTIFIER, TokenType.CLOSE_PARENTHESES))
         val FUNCION = ProductionRule("FUNCION", listOf(TokenType.OP_READ, TokenType.OP_WRITE))
         val TEXTO = ProductionRule("TEXTO", listOf(FUNCION, PARAMETROS_TEXTO))
 
+        // Reglas de producción para instrucciones
         val INSTRUCCION = ProductionRule("INSTRUCCION", listOf(TEXTO, OPERACION, DECLARACION, ASIGNACION))
 
+        // Reglas de producción para código
         val CODIGO = ProductionRule("CODIGO", listOf(INSTRUCCION, TokenType.DOT_COMA))
-        private val FIN = ProductionRule("FIN", listOf(TokenType.CLOSE_CURLY_BRACE, TokenType.END))
-        private val INICIO = ProductionRule("INICIO", listOf(TokenType.START, TokenType.OPEN_CURLY_BRACE))
-
-        private val PROGRAMA = ProductionRule("PROGRAMA", listOf(INICIO, CODIGO, FIN))
+        val FIN = ProductionRule("FIN", listOf(TokenType.CLOSE_CURLY_BRACE, TokenType.END))
+        val INICIO = ProductionRule("INICIO", listOf(TokenType.START, TokenType.OPEN_CURLY_BRACE))
+        val PROGRAMA = ProductionRule("PROGRAMA", listOf(INICIO, CODIGO, FIN))
 
         private fun checkStrictOrder(rule: ProductionRule): Boolean {
             return when (rule) {
@@ -119,7 +102,7 @@ class ProductionRules {
             return null
         }
 
-        private val allProductionRules = listOf(
+        val allProductionRules = listOf(
             VALOR_OPERACION, PARAMETROS_OPERACION, TIPO_OPERACION,
             OPERACION, VALOR_ASIGNADO, ASIGNACION, VALOR_DECLARACION,
             VALORES_DECLARACION, TIPO_DECLARACION, DECLARACION, PARAMETROS_TEXTO,

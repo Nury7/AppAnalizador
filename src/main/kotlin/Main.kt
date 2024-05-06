@@ -352,7 +352,7 @@ fun syntaxAnalyze(tokens: List<Token>): Pair<List<String>,List<TreeNode>> {
                 } else {
                     stack.pop()
                     stack.pop()
-                    stack.push(ProductionRule.INICIO)
+                    stack.push(ProductionRules.INICIO)
                 }
             }
 
@@ -370,18 +370,18 @@ fun syntaxAnalyze(tokens: List<Token>): Pair<List<String>,List<TreeNode>> {
                 } else {
                     stack.pop()
                     stack.pop()
-                    stack.push(ProductionRule.FIN)
+                    stack.push(ProductionRules.FIN)
                 }
             }
 
             TokenType.OP_READ, TokenType.OP_WRITE -> {
                 stack.pop()
-                stack.push(ProductionRule.FUNCION)
+                stack.push(ProductionRules.FUNCION)
             }
 
             TokenType.OP_SUM, TokenType.OP_RES, TokenType.OP_MUL, TokenType.OP_DIV -> {
                 stack.pop()
-                stack.push(ProductionRule.TIPO_OPERACION)
+                stack.push(ProductionRules.TIPO_OPERACION)
             }
 
             TokenType.OPEN_PARENTHESES -> {
@@ -396,20 +396,20 @@ fun syntaxAnalyze(tokens: List<Token>): Pair<List<String>,List<TreeNode>> {
                             stack.pop()
                             stack.pop()
                             stack.pop()
-                            stack.push(ProductionRule.PARAMETROS_TEXTO)
+                            stack.push(ProductionRules.PARAMETROS_TEXTO)
 
                         } else if (currentIndex + 1 < tokens.size && tokens[currentIndex + 1].type == TokenType.COMA) {
                             currentIndex++
                             stack.pop()
-                            stack.push(ProductionRule.VALOR_OPERACION)
+                            stack.push(ProductionRules.VALOR_OPERACION)
 
                             stack.push(tokens[currentIndex++].type)
                             stack.push(tokens[currentIndex].type)
 
                             when (stack.peek()) {
-                                TokenType.IDENTIFIER, TokenType.INTEGER, TokenType.FLOAT, ProductionRule.OPERACION -> {
+                                TokenType.IDENTIFIER, TokenType.INTEGER, TokenType.FLOAT, ProductionRules.OPERACION -> {
                                     stack.pop()
-                                    stack.push(ProductionRule.VALOR_OPERACION)
+                                    stack.push(ProductionRules.VALOR_OPERACION)
                                 }
 
                                 TokenType.OP_SUM, TokenType.OP_RES, TokenType.OP_MUL, TokenType.OP_DIV -> {
@@ -428,15 +428,15 @@ fun syntaxAnalyze(tokens: List<Token>): Pair<List<String>,List<TreeNode>> {
                         if (currentIndex + 1 < tokens.size && tokens[currentIndex + 1].type == TokenType.COMA) {
                             currentIndex++
                             stack.pop()
-                            stack.push(ProductionRule.VALOR_OPERACION)
+                            stack.push(ProductionRules.VALOR_OPERACION)
 
                             stack.push(tokens[currentIndex++].type)
                             stack.push(tokens[currentIndex].type)
 
                             when (stack.peek()) {
-                                TokenType.IDENTIFIER, TokenType.INTEGER, TokenType.FLOAT, ProductionRule.OPERACION -> {
+                                TokenType.IDENTIFIER, TokenType.INTEGER, TokenType.FLOAT, ProductionRules.OPERACION -> {
                                     stack.pop()
-                                    stack.push(ProductionRule.VALOR_OPERACION)
+                                    stack.push(ProductionRules.VALOR_OPERACION)
                                 }
 
                                 TokenType.OP_SUM, TokenType.OP_RES, TokenType.OP_MUL, TokenType.OP_DIV -> {
@@ -459,17 +459,17 @@ fun syntaxAnalyze(tokens: List<Token>): Pair<List<String>,List<TreeNode>> {
 
             TokenType.CLOSE_PARENTHESES -> {
                 stack.pop()
-                if (stack.peek() == ProductionRule.VALORES) {
+                if (stack.peek() == ProductionRules.VALORES) {
                     stack.pop()
                     if (stack.peek() == TokenType.OPEN_PARENTHESES) {
                         stack.pop()
-                        stack.push(ProductionRule.PARAMETROS_OPERACION)
+                        stack.push(ProductionRules.PARAMETROS_OPERACION)
                     } else {
                         errors.add("Falta '(' en los parámetros de operación")
                     }
-                } else if (stack.peek() == ProductionRule.OPERACION) {
+                } else if (stack.peek() == ProductionRules.OPERACION) {
                     stack.pop()
-                    stack.push(ProductionRule.VALOR_OPERACION)
+                    stack.push(ProductionRules.VALOR_OPERACION)
 
                     currentIndex--
                 } else {
@@ -485,65 +485,65 @@ fun syntaxAnalyze(tokens: List<Token>): Pair<List<String>,List<TreeNode>> {
                     || tokens[currentIndex - 1].type == TokenType.TYPE_FLOAT
                     || tokens[currentIndex - 1].type == TokenType.COMA) {
                     stack.pop()
-                    stack.push(ProductionRule.VALOR_DECLARACION)
+                    stack.push(ProductionRules.VALOR_DECLARACION)
                 } else {
                     errors.add("Falta operador de asignación después del identificador")
                 }
             }
 
-            TokenType.INTEGER, TokenType.FLOAT, ProductionRule.OPERACION -> {
+            TokenType.INTEGER, TokenType.FLOAT, ProductionRules.OPERACION -> {
                 stack.pop()
                 if (stack.peek() == TokenType.DESIGNATOR) {
-                    stack.push(ProductionRule.VALOR_ASIGNADO)
+                    stack.push(ProductionRules.VALOR_ASIGNADO)
 
                     stack.pop()
                     stack.pop()
                     stack.pop()
-                    stack.push(ProductionRule.ASIGNACION);
+                    stack.push(ProductionRules.ASIGNACION);
                 }
             }
 
             TokenType.TYPE_INTEGER, TokenType.TYPE_FLOAT -> {
                 stack.pop()
-                stack.push(ProductionRule.TIPO_DECLARACION)
+                stack.push(ProductionRules.TIPO_DECLARACION)
             }
 
         }
 
-        if (stack.isNotEmpty() && stack.peek() == ProductionRule.PARAMETROS_TEXTO) {
+        if (stack.isNotEmpty() && stack.peek() == ProductionRules.PARAMETROS_TEXTO) {
             stack.pop()
-            if (stack.peek() == ProductionRule.FUNCION) {
+            if (stack.peek() == ProductionRules.FUNCION) {
                 stack.pop()
-                stack.push(ProductionRule.TEXTO)
+                stack.push(ProductionRules.TEXTO)
             } else {
                 errors.add("Falta especificar función")
             }
         }
 
-        if (stack.isNotEmpty() && stack.peek() == ProductionRule.PARAMETROS_OPERACION) {
+        if (stack.isNotEmpty() && stack.peek() == ProductionRules.PARAMETROS_OPERACION) {
             stack.pop()
-            if (stack.peek() == ProductionRule.TIPO_OPERACION) {
+            if (stack.peek() == ProductionRules.TIPO_OPERACION) {
                 stack.pop()
                 if (stack.peek() == TokenType.DESIGNATOR) {
-                    stack.push(ProductionRule.OPERACION)
+                    stack.push(ProductionRules.OPERACION)
 
                     stack.pop()
-                    stack.push(ProductionRule.VALOR_ASIGNADO)
+                    stack.push(ProductionRules.VALOR_ASIGNADO)
                 } else {
-                    stack.push(ProductionRule.OPERACION)
+                    stack.push(ProductionRules.OPERACION)
                 }
             } else {
                 errors.add("Falta especificar operación")
             }
         }
 
-        if (stack.isNotEmpty() && stack.peek() == ProductionRule.VALOR_OPERACION) {
+        if (stack.isNotEmpty() && stack.peek() == ProductionRules.VALOR_OPERACION) {
             stack.pop()
             if (stack.peek() == TokenType.COMA) {
                 stack.pop()
-                if (stack.peek() == ProductionRule.VALOR_OPERACION) {
+                if (stack.peek() == ProductionRules.VALOR_OPERACION) {
                     stack.pop()
-                    stack.push(ProductionRule.VALORES)
+                    stack.push(ProductionRules.VALORES)
                 } else {
                     errors.add("Falta primer parámetro")
                 }
@@ -552,21 +552,21 @@ fun syntaxAnalyze(tokens: List<Token>): Pair<List<String>,List<TreeNode>> {
             }
         }
 
-        if (stack.isNotEmpty() && stack.peek() == ProductionRule.VALORES) {
+        if (stack.isNotEmpty() && stack.peek() == ProductionRules.VALORES) {
             val nextIndex = currentIndex + 1
             if (nextIndex < tokens.size && tokens[nextIndex].type != TokenType.CLOSE_PARENTHESES) {
                 errors.add("Falta ')' en operación")
             }
         }
 
-        if (stack.isNotEmpty() && stack.peek() == ProductionRule.VALOR_ASIGNADO) {
+        if (stack.isNotEmpty() && stack.peek() == ProductionRules.VALOR_ASIGNADO) {
             stack.pop()
             if (stack.peek() == TokenType.DESIGNATOR) {
                 stack.pop()
                 if (stack.peek() == TokenType.IDENTIFIER) {
                     stack.pop()
 
-                    stack.push(ProductionRule.ASIGNACION)
+                    stack.push(ProductionRules.ASIGNACION)
                 } else {
                     errors.add("Falta el identificador a asignar")
                 }
@@ -575,33 +575,33 @@ fun syntaxAnalyze(tokens: List<Token>): Pair<List<String>,List<TreeNode>> {
             }
         }
 
-        if (stack.isNotEmpty() && stack.peek() == ProductionRule.ASIGNACION) {
+        if (stack.isNotEmpty() && stack.peek() == ProductionRules.ASIGNACION) {
             stack.pop()
 
-            if(stack.peek() == ProductionRule.TIPO_DECLARACION){
-                stack.push(ProductionRule.VALORES_DECLARACION)
+            if(stack.peek() == ProductionRules.TIPO_DECLARACION){
+                stack.push(ProductionRules.VALORES_DECLARACION)
             } else {
-                stack.push(ProductionRule.ASIGNACION)
+                stack.push(ProductionRules.ASIGNACION)
             }
 
         }
 
-        if (stack.isNotEmpty() && stack.peek() == ProductionRule.VALOR_DECLARACION) {
+        if (stack.isNotEmpty() && stack.peek() == ProductionRules.VALOR_DECLARACION) {
             val nextIndex = currentIndex + 1
 
             stack.pop()
-            stack.push(ProductionRule.VALORES_DECLARACION)
+            stack.push(ProductionRules.VALORES_DECLARACION)
             if (nextIndex < tokens.size && tokens[nextIndex].type == TokenType.COMA) {
                 currentIndex++
             } else {
                 stack.pop()
-                if (stack.peek() == ProductionRule.TIPO_DECLARACION) {
-                    stack.push(ProductionRule.VALORES_DECLARACION)
+                if (stack.peek() == ProductionRules.TIPO_DECLARACION) {
+                    stack.push(ProductionRules.VALORES_DECLARACION)
                 } else if (stack.peek() == TokenType.COMA) {
                     stack.pop()
-                    if (stack.peek() == ProductionRule.VALORES_DECLARACION) {
+                    if (stack.peek() == ProductionRules.VALORES_DECLARACION) {
                         stack.pop()
-                        stack.push(ProductionRule.VALORES_DECLARACION)
+                        stack.push(ProductionRules.VALORES_DECLARACION)
                     } else {
                         errors.add("No se especifica el tipo de declaracion")
                     }
@@ -611,11 +611,11 @@ fun syntaxAnalyze(tokens: List<Token>): Pair<List<String>,List<TreeNode>> {
             }
         }
 
-        if (stack.isNotEmpty() && stack.peek() == ProductionRule.VALORES_DECLARACION) {
+        if (stack.isNotEmpty() && stack.peek() == ProductionRules.VALORES_DECLARACION) {
             stack.pop()
-            if (stack.peek() == ProductionRule.TIPO_DECLARACION) {
+            if (stack.peek() == ProductionRules.TIPO_DECLARACION) {
                 stack.pop()
-                stack.push(ProductionRule.DECLARACION)
+                stack.push(ProductionRules.DECLARACION)
             } else {
                 errors.add("Falta el tipo de dato a declarar")
             }
@@ -623,32 +623,32 @@ fun syntaxAnalyze(tokens: List<Token>): Pair<List<String>,List<TreeNode>> {
 
         if (stack.isNotEmpty() && stack.peek() == TokenType.DOT_COMA) {
             stack.pop()
-            if (stack.peek() == ProductionRule.TEXTO || stack.peek() == ProductionRule.OPERACION
-                || stack.peek() == ProductionRule.DECLARACION || stack.peek() == ProductionRule.ASIGNACION
+            if (stack.peek() == ProductionRules.TEXTO || stack.peek() == ProductionRules.OPERACION
+                || stack.peek() == ProductionRules.DECLARACION || stack.peek() == ProductionRules.ASIGNACION
             ) {
                 stack.pop()
-                stack.push(ProductionRule.INSTRUCCION)
+                stack.push(ProductionRules.INSTRUCCION)
             } else {
                 errors.add("';' mal colocado")
             }
         }
 
-        if (stack.isNotEmpty() && stack.peek() == ProductionRule.INSTRUCCION) {
+        if (stack.isNotEmpty() && stack.peek() == ProductionRules.INSTRUCCION) {
             stack.pop()
-            if (stack.isNotEmpty() && stack.peek() == ProductionRule.CODIGO) {
+            if (stack.isNotEmpty() && stack.peek() == ProductionRules.CODIGO) {
                 stack.pop()
             }
-            stack.push(ProductionRule.CODIGO)
+            stack.push(ProductionRules.CODIGO)
             println(stack)
         }
 
-        if (stack.isNotEmpty() && stack.peek() == ProductionRule.FIN) {
+        if (stack.isNotEmpty() && stack.peek() == ProductionRules.FIN) {
             stack.pop()
-            if (stack.peek() == ProductionRule.CODIGO) {
+            if (stack.peek() == ProductionRules.CODIGO) {
                 stack.pop()
-                if (stack.peek() == ProductionRule.INICIO) {
+                if (stack.peek() == ProductionRules.INICIO) {
                     stack.pop()
-                    stack.push(ProductionRule.PROGRAMA)
+                    stack.push(ProductionRules.PROGRAMA)
                 }
             }
         }
@@ -656,7 +656,7 @@ fun syntaxAnalyze(tokens: List<Token>): Pair<List<String>,List<TreeNode>> {
         currentIndex++
     }
 
-    if (tokens.isNotEmpty() && stack.peek() == ProductionRule.PROGRAMA) {
+    if (tokens.isNotEmpty() && stack.peek() == ProductionRules.PROGRAMA) {
         stack.pop()
     } else {
         errors.add("Error en la compilación")
