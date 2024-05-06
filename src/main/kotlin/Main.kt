@@ -303,7 +303,7 @@ fun lexicalAnalyze(sourceCode: String): Pair<Pair<List<Token>, List<String>>, Li
             for (tokenType in TokenType.values()) {
                 val matcher = Regex(tokenType.pattern).toPattern().matcher(word)
                 if (matcher.matches()) {
-                    tokens.add(Token(tokenType, word))
+                    tokens.add(Token(tokenType, word, lineNumber))
                     if (tokenType == TokenType.IDENTIFIER && !vars.contains(word)) {
                         vars.add(word)
                     }
@@ -329,17 +329,19 @@ fun syntaxAnalyze(tokens: List<Token>): Pair<List<String>,List<TreeNode>> {
     val stack = Stack<Any>()
 
     var currentIndex = 0
+    var lineNumber = 1
 
     while (currentIndex < tokens.size) {
         val currentToken = tokens[currentIndex]
         stack.push(currentToken.type)
-        println(stack)
+        lineNumber = currentToken.line
+
 
         when (stack.peek()) {
             TokenType.START -> {
                 val nextIndex = currentIndex + 1
                 if (nextIndex < tokens.size && tokens[nextIndex].type != TokenType.OPEN_CURLY_BRACE) {
-                    errors.add("Falta '{' después de INICIO")
+                    errors.add("Error at line ${lineNumber}: Falta '{' después de INICIO")
                 }
             }
 
